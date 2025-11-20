@@ -1,0 +1,257 @@
+No problem — here is a **simple, beginner-friendly, step-by-step guide** that will take you from **zero AWS experience** to running **Qwen Thinker inference** on GSM8K & MATH.
+
+I’ll walk you through:
+
+1. Create AWS account
+2. Launch GPU instance
+3. Connect to it
+4. Install everything
+5. Run inference
+6. Save results
+
+If you'd like, I can also generate an **automated script** so you just copy & paste one command.
+
+---
+
+# 🟦 **STEP 1 — Create AWS Account (if you haven’t already)**
+
+1. Go to **[https://aws.amazon.com/](https://aws.amazon.com/)**
+2. Create a free account
+3. You will need to enter:
+
+   * Email
+   * Phone number
+   * Credit/debit card
+4. Choose **Personal account** unless you’re doing this for a company.
+
+---
+
+# 🟦 **STEP 2 — Open the EC2 Dashboard**
+
+Once logged in:
+
+1. Go to the AWS console
+2. Search for **EC2**
+3. Click **Launch Instance**
+
+---
+
+# 🟦 **STEP 3 — Create Your First GPU Instance**
+
+### 3.1 Name it
+
+Example:
+**qwen-thinker-inference**
+
+### 3.2 Choose an AMI (operating system)
+
+Search for:
+
+**Deep Learning AMI GPU PyTorch 2.1 (Ubuntu 22.04)**
+(This has NVIDIA drivers + CUDA preinstalled.)
+
+Select it.
+
+### 3.3 Choose instance type (GPU!)
+
+Best cost/performance:
+
+| Instance       | GPU             | VRAM | Cost ($/hr est.) | Good for        |
+| -------------- | --------------- | ---- | ---------------- | --------------- |
+| **g5.2xlarge** | 1 × NVIDIA A10G | 24GB | ~$0.55–$0.70     | Qwen Thinker 7B |
+| g5.4xlarge     | 1 × A10G        | 24GB | ~$1.15           | More speed      |
+| g6.2xlarge     | 1 × L4          | 24GB | ~$0.39–$0.55     | Newer GPU       |
+
+Pick **g5.2xlarge** to keep it simple.
+
+### 3.4 Create Key Pair
+
+You will see **Create Key Pair** → click it.
+
+* Name: `aws_gpu_key`
+* Type: RSA
+* Download the `.pem` file
+* KEEP IT SAFE — you need this to connect.
+
+### 3.5 Networking
+
+Ensure:
+
+* **Allow SSH** (port 22)
+* Allow **HTTP** (port 80) if you use a web API (not required now)
+
+### 3.6 Storage
+
+Leave defaults (100GB recommended).
+
+### 3.7 Launch Instance
+
+Click **Launch Instance**.
+
+Your GPU machine is now starting.
+
+---
+
+# 🟦 **STEP 4 — Connect to Your GPU Instance**
+
+### 4.1 Find your instance public IPv4
+
+In EC2 → Instances → click your instance
+Copy the **Public IPv4 address**.
+
+### 4.2 Change permissions of your `.pem` key file
+
+On your local machine (Mac/Linux):
+
+```bash
+chmod 400 aws_gpu_key.pem
+```
+
+### 4.3 SSH into the instance
+
+```bash
+ssh -i aws_gpu_key.pem ubuntu@<PUBLIC_IP>
+```
+
+If you're on Windows, use WSL or PuTTY (I can walk you through that too).
+
+---
+
+# 🟦 **STEP 5 — Install Dependencies (copy/paste)**
+
+When you're inside the instance:
+
+### 5.1 Create environment
+
+```bash
+conda create -n qwen python=3.10 -y
+conda activate qwen
+```
+
+### 5.2 Install required packages
+
+```bash
+pip install vllm transformers accelerate datasets huggingface_hub
+```
+
+### 5.3 Log in to Hugging Face (only needed once)
+
+```bash
+huggingface-cli login
+```
+
+Paste your HF token.
+
+---
+
+# 🟦 **STEP 6 — Run Qwen Thinker Inference**
+
+Below is a **single Python script** you can save as
+`run_inference.py`.
+
+```python
+from datasets import load_dataset
+from vllm import LLM, SamplingParams
+import json
+
+# Load model
+llm = LLM(
+    model="Qwen/Qwen2.5-7B-Thinker",
+    tensor_parallel_size=1,
+)
+
+sampling_params = SamplingParams(
+    temperature=0.2,
+    max_tokens=2048,
+)
+
+PROMPT = """You are a strong mathematical reasoner.
+
+Solve the following problem step-by-step using detailed reasoning.
+At the end, provide ONLY the final answer on a separate line.
+
+Format EXACTLY as:
+
+<reasoning>
+YOUR DETAILED CHAIN OF THOUGHT
+</reasoning>
+
+<answer>
+FINAL ANSWER ONLY
+</answer>
+
+Question: {question}
+"""
+
+def process(question):
+    prompt = PROMPT.format(question=question)
+    outputs = llm.generate(prompt, sampling_params)
+    text = outputs[0].outputs[0].text
+
+    reasoning = text.split("<reasoning>")[1].split("</reasoning>")[0].strip()
+    answer = text.split("<answer>")[1].split("</answer>")[0].strip()
+
+    return {"question": question, "reasoning": reasoning, "answer": answer}
+
+
+gsm8k = load_dataset("openai/gsm8k", "main")
+
+results = []
+
+for item in gsm8k["test"]:
+    q = item["question"]
+    results.append(process(q))
+
+with open("gsm8k_qwen_thinker.json", "w") as f:
+    json.dump(results, f, indent=2)
+```
+
+### Run it:
+
+```bash
+python run_inference.py
+```
+
+Your JSON file will be created in your instance.
+
+---
+
+# 🟦 **STEP 7 — Download Results to Your Computer**
+
+From your local machine:
+
+```bash
+scp -i aws_gpu_key.pem ubuntu@<PUBLIC_IP>:~/gsm8k_qwen_thinker.json .
+```
+
+---
+
+# 🟥 **STEP 8 — STOP THE INSTANCE**
+
+This is *important* to avoid charges.
+
+In EC2:
+
+* Select your instance
+* Click **Instance state → Stop**
+
+(Do not terminate unless you are done forever.)
+
+---
+
+# 🎉 You’re Done!
+
+You have run Qwen Thinker with reasoning + answer separation on AWS.
+
+---
+
+# If you'd like, I can also provide:
+
+✅ A simpler script with progress bars
+✅ A version that runs GSM8K + MATH in batches
+✅ Docker-based deployment
+✅ Cheapest possible configuration
+✅ AWS Lightsail version (easier than EC2)
+✅ Terraform template to automate everything
+
+Just tell me!
