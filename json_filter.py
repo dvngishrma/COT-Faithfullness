@@ -1,9 +1,9 @@
 import json
 
 # ---- Update file names here ----
-file1 = "gsm8k_qwen_vllm.json"
-file2 = "gsm8k_qwen_vllm_v2.json"
-output_file = "gsm8k_qwen.json"
+file1 = "math_qwen.json"
+file2 = "math_qwen_vllm_v3.json"
+output_file = "math_qwen.json"
 # --------------------------------
 
 # Load the two JSON files
