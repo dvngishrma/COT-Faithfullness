@@ -7,7 +7,7 @@ from vllm import LLM, SamplingParams
 
 MODEL_NAME = "Qwen/Qwen3-8B"
 BATCH_SIZE = 1  
-OUTPUT_FILE = "math_qwen_vllm_v2.json"
+OUTPUT_FILE = "math_qwen_vllm_v3.json"
 
 
 sampling_params = SamplingParams(
@@ -71,7 +71,7 @@ count = 0
 for split_name in ["train", "test"]:
     for item in math[split_name]:
         count += 1
-        if count<=2900:
+        if count<=7900:
             continue
         question = item["problem"]
         print(f"Processing {split_name} example {count}: {question[:50]}...")
